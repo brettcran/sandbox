@@ -19,6 +19,7 @@
     html,body{height:100%}
     body{margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--fg)}
 
+    /* Toolbar */
     #toolbar{
       position:fixed; bottom:calc(12px + var(--safe-bottom)); left:50%; transform:translateX(-50%);
       display:flex; gap:12px; padding:12px; border-radius:28px; z-index:40;
@@ -36,6 +37,7 @@
     .btn svg{ width:28px; height:28px; stroke:var(--icon); fill:none; stroke-width:2; }
     .btn.active{ box-shadow:0 0 0 2px #4ea3ff inset }
 
+    /* Stage */
     #pdf-stage{ position:relative; height:100vh; overflow:auto; -webkit-overflow-scrolling:touch; background:var(--bg) }
     #pdf-scroll{ position:relative; touch-action:pan-y }
     #pdf-container{
@@ -46,17 +48,23 @@
     .page-wrap{ position:relative; width:max(320px,72vw); margin:12px 0 }
     canvas.pdfpage{ display:block; width:100%; height:auto; background:var(--canvas-bg); border-radius:6px; touch-action:none }
 
+    /* Overlays & annotations */
     .overlay{ position:absolute; inset:0; pointer-events:auto; touch-action:manipulation; }
     .anno{ position:absolute; user-select:none; touch-action:none; }
     .anno.selected{ outline:1.5px dashed #4ea3ff; outline-offset:2px }
-    .anno.text{ min-width:10px; min-height:16px; padding:2px 4px; background:transparent; color:#000; font:16px Arial, sans-serif; cursor:text; -webkit-user-select:text; user-select:text; }
+    .anno.text{
+      min-width:10px; min-height:16px; padding:2px 4px; background:transparent; color:#000;
+      font:16px Arial, sans-serif; cursor:text; -webkit-user-select:text; user-select:text;
+    }
     .anno.stamp svg{ width:22px; height:22px; stroke:#000; stroke-width:2; fill:none }
     .anno.sign img{ user-select:none; pointer-events:none; display:block }
     .anno .handle{ position:absolute; width:14px; height:14px; background:#fff; border:2px solid #4ea3ff; border-radius:3px; }
     .anno .handle.br{ right:-8px; bottom:-8px; cursor:nwse-resize; touch-action:none }
 
-    #file-input{ display:none }
+    /* File input */
+    #file-input{ position:absolute; left:-9999px; width:0; height:0; opacity:0; }
 
+    /* Toast */
     #toast{ position:fixed; top:12px; left:50%; transform:translateX(-50%);
       background:#0b1020d0; color:#eaf2ff; padding:8px 12px; border-radius:10px;
       border:1px solid rgba(255,255,255,.18); z-index:70; font-size:13px; display:none }
@@ -64,6 +72,7 @@
     #toast.ok{ box-shadow:0 0 0 1px var(--ok) inset } #toast.err{ box-shadow:0 0 0 1px var(--err) inset }
     @keyframes fade{ from{opacity:0; transform:translateX(-50%) translateY(-6px)} to{opacity:1} }
 
+    /* Restore banner */
     #restore-banner{
       position:fixed; top:48px; left:50%; transform:translateX(-50%);
       z-index:69; background:rgba(20,24,32,.96); color:#e9eef5;
@@ -75,6 +84,7 @@
       background:#1c2430; color:#e9eef5; border-radius:8px; padding:6px 10px; cursor:pointer;
     }
 
+    /* Signature Modal */
     .modal{
       position:fixed; inset:50% auto auto 50%; transform:translate(-50%,-50%);
       z-index:60; background:rgba(20,24,32,.96); color:#e9eef5;
@@ -89,12 +99,16 @@
   </style>
 </head>
 <body>
+  <!-- Hidden file input (accessible via label) -->
   <input id="file-input" type="file" accept="application/pdf,.pdf" />
 
+  <!-- Toolbar -->
   <div id="toolbar" aria-label="Tools">
-    <button class="btn" data-act="open" title="Open PDF" type="button" aria-label="Open">
+    <!-- OPEN uses a LABEL to guarantee native picker fires on iOS/Safari -->
+    <label class="btn" title="Open PDF" aria-label="Open" for="file-input" id="open-proxy">
       <svg viewBox="0 0 24 24"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h3l2 2h4"/></svg>
-    </button>
+    </label>
+
     <button class="btn" data-act="text" title="Text (double‑tap/click)" type="button" aria-label="Text">
       <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M12 6v12"/></svg>
     </button>
@@ -118,20 +132,24 @@
     </button>
   </div>
 
+  <!-- Stage -->
   <div id="pdf-stage">
     <div id="pdf-scroll">
       <div id="pdf-container"></div>
     </div>
   </div>
 
+  <!-- Toast -->
   <div id="toast" role="status" aria-live="polite"></div>
 
+  <!-- Restore banner -->
   <div id="restore-banner">
     <span id="restore-text">A previous session was found.</span>
     <button id="restore-yes" type="button">Restore</button>
     <button id="restore-no" type="button">Discard</button>
   </div>
 
+  <!-- Signature Modal -->
   <div id="sign-modal" class="modal" role="dialog" aria-modal="true" aria-label="Signature">
     <h3 style="margin:6px 0 10px;font:600 16px system-ui">Draw your signature</h3>
     <canvas id="sig-pad" width="500" height="200"
@@ -146,7 +164,7 @@
   <!-- App (ESM) -->
   <script type="module" src="./lib/app/app.mjs"></script>
 
-  <!-- PWA: service worker registration (relative path for GH Pages) -->
+  <!-- PWA SW registration -->
   <script type="module">
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(console.warn);
