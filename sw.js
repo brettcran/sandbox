@@ -1,13 +1,14 @@
-const CACHE = 'turbosign-v1';
+// TurboSign SW v2 (relative paths; GH Pages friendly)
+const CACHE = 'turbosign-v2';
 const PRECACHE = [
-  '/', '/index.html',
-  '/lib/app/app.mjs',
-  '/lib/build/pdf.mjs',
-  '/lib/build/pdf.worker.mjs',
-  '/lib/vendor/pdf-lib.esm.js',
-  '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png'
+  'index.html',
+  'manifest.json',
+  'lib/app/app.mjs',
+  'lib/build/pdf.mjs',
+  'lib/build/pdf.worker.mjs',
+  'lib/vendor/pdf-lib.esm.js',
+  'icon-192.png',
+  'icon-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -19,22 +20,29 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
 });
 
+// Cache-first for same-origin app shell / modules; network-first fallback
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  // Cache-first for our app shell & modules
-  if (PRECACHE.includes(url.pathname)) {
-    event.respondWith(caches.match(event.request).then(r => r || fetch(event.request)));
-    return;
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached;
+        return fetch(request).then(resp => {
+          const copy = resp.clone();
+          caches.open(CACHE).then(c => c.put(request, copy));
+          return resp;
+        });
+      })
+    );
   }
-  // Network-first for everything else (fallback to cache)
-  event.respondWith(
-    fetch(event.request).then(response => {
-      const copy = response.clone();
-      caches.open(CACHE).then(cache => cache.put(event.request, copy));
-      return response;
-    }).catch(() => caches.match(event.request))
-  );
 });
