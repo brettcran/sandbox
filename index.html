@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>TurboSign — PDF Annotator (ESM)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0f131a">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" sizes="192x192" href="/icon-192.png">
+  <link rel="icon" sizes="512x512" href="/icon-512.png">
+  <style>
+    :root{
+      --bg:#0f131a; --fg:#e9eef5; --panel:rgba(255,255,255,.08); --border:rgba(255,255,255,.14);
+      --btn:#1c2430; --btn-hov:#263244; --icon:#e9eef5; --canvas-bg:#fff;
+      --ok:#16a34a; --err:#ef4444; --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--fg)}
+
+    /* Toolbar */
+    #toolbar{
+      position:fixed; bottom:calc(12px + var(--safe-bottom)); left:50%; transform:translateX(-50%);
+      display:flex; gap:12px; padding:12px; border-radius:28px; z-index:40;
+      background:var(--panel); border:1px solid var(--border); backdrop-filter:blur(10px);
+      max-width:95vw; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+    }
+    #toolbar::-webkit-scrollbar{ display:none }
+    .btn{
+      appearance:none; border:1px solid var(--border); background:var(--btn); color:var(--icon);
+      width:56px; height:56px; border-radius:50%; display:grid; place-items:center;
+      cursor:pointer; transition:background .2s, transform .08s; flex:0 0 auto;
+    }
+    .btn:hover{ background:var(--btn-hov) }
+    .btn:active{ transform:translateY(1px) }
+    .btn svg{ width:28px; height:28px; stroke:var(--icon); fill:none; stroke-width:2; }
+    .btn.active{ box-shadow:0 0 0 2px #4ea3ff inset }
+
+    /* Stage */
+    #pdf-stage{ position:relative; height:100vh; overflow:auto; -webkit-overflow-scrolling:touch; background:var(--bg) }
+    #pdf-scroll{ position:relative; touch-action:pan-y }
+    #pdf-container{
+      position:relative; transform-origin:0 0;
+      display:flex; flex-direction:column; align-items:center; gap:12px;
+      padding:20px 0 calc(140px + var(--safe-bottom)); min-height:60vh;
+    }
+    .page-wrap{ position:relative; width:max(320px,72vw); margin:12px 0 }
+    canvas.pdfpage{ display:block; width:100%; height:auto; background:var(--canvas-bg); border-radius:6px; touch-action:none }
+
+    /* Overlays & annotations */
+    .overlay{ position:absolute; inset:0; pointer-events:auto; touch-action:manipulation; }
+    .anno{ position:absolute; user-select:none; touch-action:none; }
+    .anno.selected{ outline:1.5px dashed #4ea3ff; outline-offset:2px }
+    .anno.text{
+      min-width:10px; min-height:16px; padding:2px 4px; background:transparent; color:#000;
+      font:16px Arial, sans-serif; cursor:text; -webkit-user-select:text; user-select:text;
+    }
+    .anno.stamp svg{ width:22px; height:22px; stroke:#000; stroke-width:2; fill:none }
+    .anno.sign img{ user-select:none; pointer-events:none; display:block }
+    .anno .handle{ position:absolute; width:14px; height:14px; background:#fff; border:2px solid #4ea3ff; border-radius:3px; }
+    .anno .handle.br{ right:-8px; bottom:-8px; cursor:nwse-resize; touch-action:none }
+
+    /* Hidden file input */
+    #file-input{ display:none }
+
+    /* Toast (top) */
+    #toast{ position:fixed; top:12px; left:50%; transform:translateX(-50%);
+      background:#0b1020d0; color:#eaf2ff; padding:8px 12px; border-radius:10px;
+      border:1px solid rgba(255,255,255,.18); z-index:70; font-size:13px; display:none }
+    #toast.show{ display:block; animation:fade .2s ease-out }
+    #toast.ok{ box-shadow:0 0 0 1px var(--ok) inset } #toast.err{ box-shadow:0 0 0 1px var(--err) inset }
+    @keyframes fade{ from{opacity:0; transform:translateX(-50%) translateY(-6px)} to{opacity:1} }
+
+    /* Restore banner */
+    #restore-banner{
+      position:fixed; top:48px; left:50%; transform:translateX(-50%);
+      z-index:69; background:rgba(20,24,32,.96); color:#e9eef5;
+      border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:8px 10px;
+      display:none; gap:8px; align-items:center; font:13px system-ui;
+    }
+    #restore-banner button{
+      appearance:none; border:1px solid rgba(255,255,255,.18);
+      background:#1c2430; color:#e9eef5; border-radius:8px; padding:6px 10px; cursor:pointer;
+    }
+
+    /* Signature Modal */
+    .modal{
+      position:fixed; inset:50% auto auto 50%; transform:translate(-50%,-50%);
+      z-index:60; background:rgba(20,24,32,.96); color:#e9eef5;
+      border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:12px;
+      width:min(92vw,520px); box-shadow:0 12px 40px rgba(0,0,0,.5);
+      display:block; opacity:0; pointer-events:none; transition:opacity .15s ease-out;
+    }
+    .modal.show{ opacity:1; pointer-events:auto; }
+    .modal .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px }
+    .modal .chip{ appearance:none; border:1px solid rgba(255,255,255,.14); background:#1c2430; color:#e9eef5;
+      border-radius:10px; padding:8px 10px; cursor:pointer }
+  </style>
+</head>
+<body>
+  <!-- Hidden file input -->
+  <input id="file-input" type="file" accept="application/pdf,.pdf" />
+
+  <!-- Toolbar -->
+  <div id="toolbar" aria-label="Tools">
+    <button class="btn" data-act="open" title="Open PDF" type="button" aria-label="Open">
+      <svg viewBox="0 0 24 24"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h3l2 2h4"/></svg>
+    </button>
+    <button class="btn" data-act="text" title="Text (double‑tap/click)" type="button" aria-label="Text">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M12 6v12"/></svg>
+    </button>
+    <button class="btn" data-act="stamp" title="Stamp (✓)" type="button" aria-label="Stamp">
+      <svg viewBox="0 0 24 24"><path d="M4 12l4 4 12-12"/></svg>
+    </button>
+    <button class="btn" data-act="sign" title="Signature" type="button" aria-label="Signature">
+      <svg viewBox="0 0 24 24"><path d="M12 19l7-7a2.8 2.8 0 0 0-4-4l-7 7-2 6z"/></svg>
+    </button>
+    <button class="btn" data-act="undo" title="Undo" type="button" aria-label="Undo">
+      <svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4"/><path d="M5 10h8a4 4 0 1 1 0 8H7"/></svg>
+    </button>
+    <button class="btn" data-act="redo" title="Redo" type="button" aria-label="Redo">
+      <svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4"/><path d="M19 10h-8a4 4 0 1 0 0 8h6"/></svg>
+    </button>
+    <button class="btn" data-act="save" title="Save (flatten to PDF)" type="button" aria-label="Save">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+    </button>
+    <button class="btn" data-act="help" title="Help" type="button" aria-label="Help">
+      <svg viewBox="0 0 24 24"><path d="M9 9a3 3 0 0 1 6 0c0 3-3 3-3 6"/><path d="M12 17h.01"/></svg>
+    </button>
+  </div>
+
+  <!-- Stage -->
+  <div id="pdf-stage">
+    <div id="pdf-scroll">
+      <div id="pdf-container"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Restore banner -->
+  <div id="restore-banner">
+    <span id="restore-text">A previous session was found.</span>
+    <button id="restore-yes" type="button">Restore</button>
+    <button id="restore-no" type="button">Discard</button>
+  </div>
+
+  <!-- Signature Modal -->
+  <div id="sign-modal" class="modal" role="dialog" aria-modal="true" aria-label="Signature">
+    <h3 style="margin:6px 0 10px;font:600 16px system-ui">Draw your signature</h3>
+    <canvas id="sig-pad" width="500" height="200"
+      style="display:block;max-width:100%;height:auto;background:#fff;border-radius:10px;touch-action:none"></canvas>
+    <div class="row">
+      <button class="chip" id="sig-use" type="button">Use</button>
+      <button class="chip" id="sig-clear" type="button">Clear</button>
+      <button class="chip" id="sig-cancel" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <!-- App (ESM) -->
+  <script type="module" src="/lib/app/app.mjs"></script>
+
+  <!-- PWA: service worker registration -->
+  <script type="module">
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.warn);
+    }
+    // Keep cached data around (helps on iOS)
+    if (navigator.storage?.persist) navigator.storage.persist().catch(()=>{});
+  </script>
+</body>
+</html>
