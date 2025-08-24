@@ -5,10 +5,6 @@
   <title>TurboSign — PDF Annotator (ESM)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" content="#0f131a">
-  <link rel="manifest" href="./manifest.json">
-  <link rel="icon" sizes="192x192" href="./icon-192.png">
-  <link rel="icon" sizes="512x512" href="./icon-512.png">
   <style>
     :root{
       --bg:#0f131a; --fg:#e9eef5; --panel:rgba(255,255,255,.08); --border:rgba(255,255,255,.14);
@@ -25,6 +21,10 @@
       display:flex; gap:12px; padding:12px; border-radius:28px; z-index:40;
       background:var(--panel); border:1px solid var(--border); backdrop-filter:blur(10px);
       max-width:95vw; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+
+      /* iOS: prevent “giant toolbar” auto-zoom and keep gestures sane */
+      -webkit-text-size-adjust:100%;
+      touch-action:manipulation;
     }
     #toolbar::-webkit-scrollbar{ display:none }
     .btn{
@@ -49,8 +49,8 @@
     canvas.pdfpage{ display:block; width:100%; height:auto; background:var(--canvas-bg); border-radius:6px; touch-action:none }
 
     /* Overlays & annotations */
-    .overlay{ position:absolute; inset:0; pointer-events:auto; touch-action:manipulation; }
-    .anno{ position:absolute; user-select:none; touch-action:none; }
+    .overlay{ position:absolute; inset:0; pointer-events:auto; touch-action:manipulation; z-index:1; }
+    .anno{ position:absolute; user-select:none; touch-action:none; z-index:2; }
     .anno.selected{ outline:1.5px dashed #4ea3ff; outline-offset:2px }
     .anno.text{
       min-width:10px; min-height:16px; padding:2px 4px; background:transparent; color:#000;
@@ -61,10 +61,10 @@
     .anno .handle{ position:absolute; width:14px; height:14px; background:#fff; border:2px solid #4ea3ff; border-radius:3px; }
     .anno .handle.br{ right:-8px; bottom:-8px; cursor:nwse-resize; touch-action:none }
 
-    /* File input */
-    #file-input{ position:absolute; left:-9999px; width:0; height:0; opacity:0; }
+    /* Hidden file input */
+    #file-input{ display:none }
 
-    /* Toast */
+    /* Toast (top) */
     #toast{ position:fixed; top:12px; left:50%; transform:translateX(-50%);
       background:#0b1020d0; color:#eaf2ff; padding:8px 12px; border-radius:10px;
       border:1px solid rgba(255,255,255,.18); z-index:70; font-size:13px; display:none }
@@ -99,16 +99,14 @@
   </style>
 </head>
 <body>
-  <!-- Hidden file input (accessible via label) -->
+  <!-- Hidden file input -->
   <input id="file-input" type="file" accept="application/pdf,.pdf" />
 
   <!-- Toolbar -->
   <div id="toolbar" aria-label="Tools">
-    <!-- OPEN uses a LABEL to guarantee native picker fires on iOS/Safari -->
-    <label class="btn" title="Open PDF" aria-label="Open" for="file-input" id="open-proxy">
+    <button class="btn" data-act="open" title="Open PDF" type="button" aria-label="Open">
       <svg viewBox="0 0 24 24"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h3l2 2h4"/></svg>
-    </label>
-
+    </button>
     <button class="btn" data-act="text" title="Text (double‑tap/click)" type="button" aria-label="Text">
       <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M12 6v12"/></svg>
     </button>
@@ -163,13 +161,5 @@
 
   <!-- App (ESM) -->
   <script type="module" src="./lib/app/app.mjs"></script>
-
-  <!-- PWA SW registration -->
-  <script type="module">
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(console.warn);
-    }
-    if (navigator.storage?.persist) navigator.storage.persist().catch(()=>{});
-  </script>
 </body>
 </html>
