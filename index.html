@@ -21,10 +21,6 @@
       display:flex; gap:12px; padding:12px; border-radius:28px; z-index:40;
       background:var(--panel); border:1px solid var(--border); backdrop-filter:blur(10px);
       max-width:95vw; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
-
-      /* iOS: prevent “giant toolbar” auto-zoom and keep gestures sane */
-      -webkit-text-size-adjust:100%;
-      touch-action:manipulation;
     }
     #toolbar::-webkit-scrollbar{ display:none }
     .btn{
@@ -37,20 +33,33 @@
     .btn svg{ width:28px; height:28px; stroke:var(--icon); fill:none; stroke-width:2; }
     .btn.active{ box-shadow:0 0 0 2px #4ea3ff inset }
 
-    /* Stage */
-    #pdf-stage{ position:relative; height:100vh; overflow:auto; -webkit-overflow-scrolling:touch; background:var(--bg) }
-    #pdf-scroll{ position:relative; touch-action:pan-y }
-    #pdf-container{
-      position:relative; transform-origin:0 0;
-      display:flex; flex-direction:column; align-items:center; gap:12px;
-      padding:20px 0 calc(140px + var(--safe-bottom)); min-height:60vh;
+    /* Stage -> Scroll frame (Y only) -> Container -> Stack (scaled) */
+    #pdf-stage{ position:relative; height:100vh; overflow:hidden; background:var(--bg) }
+    #pdf-scroll{
+      position:relative; height:100%; width:100%;
+      overflow-y:auto; overflow-x:hidden; /* lock X-axis */
+      -webkit-overflow-scrolling:touch; touch-action:pan-y; /* keep native vertical scroll */
     }
+    #pdf-container{
+      position:relative; width:100%;
+      display:flex; justify-content:flex-start; /* vertical starts at top */
+      align-items:center; /* center X via flex */
+      padding:20px 0 calc(140px + var(--safe-bottom));
+      min-height:60vh;
+    }
+    /* the scaled stack */
+    #pdf-stack{
+      position:relative; transform-origin:0 0; /* we’ll keep centered via layout, not scrollLeft */
+      display:flex; flex-direction:column; align-items:center; gap:12px;
+      width:auto; /* content-defined */
+    }
+
     .page-wrap{ position:relative; width:max(320px,72vw); margin:12px 0 }
     canvas.pdfpage{ display:block; width:100%; height:auto; background:var(--canvas-bg); border-radius:6px; touch-action:none }
 
     /* Overlays & annotations */
-    .overlay{ position:absolute; inset:0; pointer-events:auto; touch-action:manipulation; z-index:1; }
-    .anno{ position:absolute; user-select:none; touch-action:none; z-index:2; }
+    .overlay{ position:absolute; inset:0; pointer-events:auto; touch-action:manipulation; }
+    .anno{ position:absolute; user-select:none; touch-action:none; }
     .anno.selected{ outline:1.5px dashed #4ea3ff; outline-offset:2px }
     .anno.text{
       min-width:10px; min-height:16px; padding:2px 4px; background:transparent; color:#000;
@@ -72,7 +81,7 @@
     #toast.ok{ box-shadow:0 0 0 1px var(--ok) inset } #toast.err{ box-shadow:0 0 0 1px var(--err) inset }
     @keyframes fade{ from{opacity:0; transform:translateX(-50%) translateY(-6px)} to{opacity:1} }
 
-    /* Restore banner */
+    /* Restore banner (kept) */
     #restore-banner{
       position:fixed; top:48px; left:50%; transform:translateX(-50%);
       z-index:69; background:rgba(20,24,32,.96); color:#e9eef5;
@@ -133,7 +142,10 @@
   <!-- Stage -->
   <div id="pdf-stage">
     <div id="pdf-scroll">
-      <div id="pdf-container"></div>
+      <div id="pdf-container">
+        <!-- new scale target -->
+        <div id="pdf-stack"></div>
+      </div>
     </div>
   </div>
 
@@ -158,6 +170,7 @@
       <button class="chip" id="sig-cancel" type="button">Cancel</button>
     </div>
   </div>
+
   <!-- App (ESM) -->
   <script type="module" src="./lib/app/app.mjs"></script>
 </body>
