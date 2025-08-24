@@ -33,46 +33,15 @@
     .btn svg{ width:28px; height:28px; stroke:var(--icon); fill:none; stroke-width:2; }
     .btn.active{ box-shadow:0 0 0 2px #4ea3ff inset }
 
-    /* Stage (Y scroll only) */
-    #pdf-stage{ position:relative; height:100vh; overflow:hidden; background:var(--bg) }
-    #pdf-scroll{
-      position:relative; height:100%; width:100%;
-      overflow-y:auto; overflow-x:hidden;          /* hard X lock */
-      -webkit-overflow-scrolling:touch; touch-action:pan-y;
-    }
-
-    #pdf-main{ position:relative; height:100%; display:flex; flex-direction:row; align-items:stretch; }
-
-    /* Thumbnails rail */
-    #thumbs{
-      position:sticky; left:0; top:0; height:100vh;
-      width:96px; padding:10px 8px; overflow-y:auto; overflow-x:hidden;
-      background:var(--panel); border-right:1px solid var(--border);
-      display:none; gap:10px; z-index:31;
-    }
-    #thumbs.open{ display:flex; flex-direction:column; }
-    #thumbs canvas{ width:80px; height:auto; border-radius:6px; background:#fff; display:block; }
-    #thumbs .pg{ position:relative; cursor:pointer; }
-    #thumbs .pg.active canvas{ outline:2px solid #4ea3ff; outline-offset:2px }
-
-    #thumbs-toggle{
-      position:fixed; left:10px; top:10px; z-index:41;
-      appearance:none; border:1px solid var(--border); background:var(--btn); color:var(--icon);
-      border-radius:10px; padding:6px 10px; cursor:pointer; display:flex; gap:6px; align-items:center;
-    }
-    #thumbs-toggle svg{ width:18px; height:18px; stroke:var(--icon); fill:none; stroke-width:2 }
-
+    /* Stage */
+    #pdf-stage{ position:relative; height:100vh; overflow:auto; -webkit-overflow-scrolling:touch; background:var(--bg) }
+    #pdf-scroll{ position:relative; touch-action:pan-y }
     #pdf-container{
-      position:relative; flex:1 1 auto; width:100%;
-      display:flex; justify-content:center;               /* center X */
-      align-items:flex-start;
-      padding:20px 0 calc(140px + var(--safe-bottom));
-      min-height:60vh;
+      position:relative; transform-origin:0 0;
+      display:flex; flex-direction:column; align-items:center; gap:12px;
+      padding:20px 0 calc(140px + var(--safe-bottom)); min-height:60vh;
     }
-    /* scale target */
-    #pdf-stack{ position:relative; transform-origin:0 0; display:flex; flex-direction:column; gap:12px; align-items:center; }
-
-    .page-wrap{ position:relative; margin:12px 0 }
+    .page-wrap{ position:relative; width:max(320px,72vw); margin:12px 0 }
     canvas.pdfpage{ display:block; width:100%; height:auto; background:var(--canvas-bg); border-radius:6px; touch-action:none }
 
     /* Overlays & annotations */
@@ -91,7 +60,7 @@
     /* Hidden file input */
     #file-input{ display:none }
 
-    /* Toast */
+    /* Toast (top) */
     #toast{ position:fixed; top:12px; left:50%; transform:translateX(-50%);
       background:#0b1020d0; color:#eaf2ff; padding:8px 12px; border-radius:10px;
       border:1px solid rgba(255,255,255,.18); z-index:70; font-size:13px; display:none }
@@ -99,13 +68,14 @@
     #toast.ok{ box-shadow:0 0 0 1px var(--ok) inset } #toast.err{ box-shadow:0 0 0 1px var(--err) inset }
     @keyframes fade{ from{opacity:0; transform:translateX(-50%) translateY(-6px)} to{opacity:1} }
 
-    /* Restore banner */
+    /* Restore banner (compact, non-blocking) */
     #restore-banner{
-      position:fixed; top:48px; left:50%; transform:translateX(-50%);
-      z-index:69; background:rgba(20,24,32,.96); color:#e9eef5;
-      border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:8px 10px;
+      position:fixed; top:12px; left:12px; right:12px; max-width:560px;
+      margin:0 auto; z-index:69; background:rgba(20,24,32,.96); color:#e9eef5;
+      border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:10px 12px;
       display:none; gap:8px; align-items:center; font:13px system-ui;
     }
+    #restore-banner .grow{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
     #restore-banner button{
       appearance:none; border:1px solid rgba(255,255,255,.18);
       background:#1c2430; color:#e9eef5; border-radius:8px; padding:6px 10px; cursor:pointer;
@@ -124,27 +94,30 @@
     .modal .chip{ appearance:none; border:1px solid rgba(255,255,255,.14); background:#1c2430; color:#e9eef5;
       border-radius:10px; padding:8px 10px; cursor:pointer }
 
-    /* Right-side custom vertical scroller */
-    #vscroll{
-      position:fixed; right:10px; top:10px; bottom:calc(100px + var(--safe-bottom));
-      width:8px; border-radius:999px;
-      background:rgba(255,255,255,.12); border:1px solid var(--border);
-      z-index:39; display:none; /* hidden until a PDF is loaded */
+    /* Page Navigator (right strip) */
+    #page-toggle{
+      position:fixed; right:10px; top:50%; transform:translateY(-50%);
+      z-index:41; background:var(--panel); border:1px solid var(--border); color:var(--fg);
+      padding:8px 10px; border-radius:12px; cursor:pointer; user-select:none;
+      backdrop-filter:blur(10px);
     }
-    #vthumb{
-      position:absolute; left:0; width:100%; height:56px; border-radius:999px;
-      background:#4ea3ff; box-shadow:0 1px 3px rgba(0,0,0,.4); cursor:grab; touch-action:none;
+    #page-nav{
+      position:fixed; right:10px; top:10px; bottom:calc(100px + var(--safe-bottom)); /* stays above toolbar */
+      width:min(120px,26vw); z-index:42;
+      background:rgba(20,24,32,.92); border:1px solid var(--border); border-radius:12px;
+      padding:8px; overflow:auto; display:flex; flex-direction:column; gap:8px;
+      transform:translateX(140%); transition:transform .18s ease-out;
+      backdrop-filter:blur(10px);
     }
+    #page-nav.show{ transform:translateX(0) }
+    #page-nav canvas{ width:100%; height:auto; border-radius:6px; background:#111 }
+    #page-nav .thumb{ position:relative; cursor:pointer; }
+    #page-nav .thumb .pg{ position:absolute; right:6px; bottom:6px; font:11px/1 system-ui; color:#dbe3ff; background:#0009; padding:2px 5px; border-radius:6px }
   </style>
 </head>
 <body>
   <!-- Hidden file input -->
   <input id="file-input" type="file" accept="application/pdf,.pdf" />
-
-  <!-- Thumbnails toggle -->
-  <button id="thumbs-toggle" type="button" title="Pages">
-    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h8"/></svg> Pages
-  </button>
 
   <!-- Toolbar -->
   <div id="toolbar" aria-label="Tools">
@@ -177,25 +150,20 @@
   <!-- Stage -->
   <div id="pdf-stage">
     <div id="pdf-scroll">
-      <div id="pdf-main">
-        <div id="thumbs" aria-label="Pages"></div>
-        <div id="pdf-container">
-          <!-- scale target -->
-          <div id="pdf-stack"></div>
-        </div>
-      </div>
+      <div id="pdf-container"></div>
     </div>
   </div>
 
-  <!-- Custom right-side vertical scroller -->
-  <div id="vscroll" aria-hidden="true"><div id="vthumb"></div></div>
+  <!-- Page navigator toggle + panel -->
+  <div id="page-toggle" role="button" aria-controls="page-nav" aria-expanded="false">Pages</div>
+  <div id="page-nav" aria-label="Pages"></div>
 
   <!-- Toast -->
   <div id="toast" role="status" aria-live="polite"></div>
 
   <!-- Restore banner -->
   <div id="restore-banner">
-    <span id="restore-text">A previous session was found.</span>
+    <div id="restore-text" class="grow">A previous session was found.</div>
     <button id="restore-yes" type="button">Restore</button>
     <button id="restore-no" type="button">Discard</button>
   </div>
